@@ -1,26 +1,36 @@
-on: [push]
 name: file
+on:
+  push:
+    branches:
+      - main
 jobs:
-    build-and-deploy:
-      runs-on: ubuntu-latest
-      steps:
-
-        # Checkout code
-      - uses: actions/checkout@main
-
-        # Log into Azure
-      - uses: azure/login@v1
-        with:
-          creds: ${{ secrets.CREDENTIALS_AZURE }}
-
-        # Deploy ARM template
-      - name: Run ARM deploy
-        uses: azure/arm-deploy@v1
-        with:
-          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION }}
-          resourceGroupName: ${{ secrets.RG01 }}
-          template: ./azuredeploy.json
-          parameters: storageAccountType=Standard_LRS
-
-        # output containerName variable from template
-      - run: echo ${{ steps.deploy.outputs.containerName }}
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Validate Bicep File
+      shell: bash
+      run: |
+        curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
+        chmod +x ./bicep
+        ./bicep validate ./main.bicep
+    - name: Prompt for Resource Group name
+      id: prompt-rgname
+      run: |
+        echo "::set-output name=rgname::$(read -p 'Enter Resource Group name: ' && echo $REPLY)"
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.CREDENTIALS_AZURE }}
+    - name: Build and deploy ARM template
+      uses: azure/arm-deploy@v1
+      with:
+        subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        resourceGroupName: ${{ steps.prompt-rgname.outputs.rgname }}
+        template: ./main.bicep
+        parameters: ./var.params.json
+        deploymentMode: 'Incremental'
+        enableDeploymentPrerequisites: true
+      env:
+        ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+        ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
