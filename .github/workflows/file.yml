@@ -1,6 +1,6 @@
+name: file
 on: [push]
-  name: file
-  jobs:
+jobs:
     build-and-deploy:
       runs-on: ubuntu-latest
       steps:
