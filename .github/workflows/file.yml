@@ -21,6 +21,9 @@ jobs:
           resourceGroupName: ${{ secrets.AZURE_RG }}
           template: .azuredeploy.parameters.json
           parameters: storageAccountType=Standard_LRS
+          params:
+           resourceGroupName:
+              description: 'RG01'
+          required: true
 
-        # output containerName variable from template
-      - run: echo ${{ steps.deploy.outputs.containerName }}
+ # output containerName variable from template - run: echo ${{ steps.deploy.outputs.containerName }}
