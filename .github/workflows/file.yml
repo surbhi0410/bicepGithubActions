@@ -21,6 +21,7 @@ jobs:
           resourceGroupName: ${{ secrets.RG01 }}
           template: ./azuredeploy.json
           parameters: storageAccountType=Standard_LRS
+          failOnStdErr: true
 
         # output containerName variable from template
       - run: echo ${{ steps.deploy.outputs.containerName }}
