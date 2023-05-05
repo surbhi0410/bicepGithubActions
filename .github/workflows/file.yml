@@ -1,36 +1,34 @@
+on: [push]
 name: file
-on:
-  push:
-    branches:
-      - main
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: Validate Bicep File
-      shell: bash
-      run: |
-        curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
-        chmod +x ./bicep
-        ./bicep validate ./command.bicep
-    - name: Prompt for Resource Group name
-      id: prompt-rgname
-      run: |
-        echo "::set-output name=rgname::$(read -p 'RG01: ' && echo $REPLY)"
-    - name: Login to Azure
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.CREDENTIALS_AZURE }}
-    - name: Build and deploy ARM template
-      uses: azure/arm-deploy@v1
-      with:
-        subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-        resourceGroupName: ${{ steps.prompt-rgname.outputs.rgname }}
-        template: ./main.bicep
-        parameters: ./var.params.json
-        deploymentMode: 'Incremental'
-        enableDeploymentPrerequisites: true
-      env:
-        ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-        ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+
+      # Checkout code
+      - uses: actions/checkout@main
+
+      # Log into Azure
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.CREDENTIALS_AZURE }}
+
+      # Prompt for Resource Group name
+      - name: Prompt for Resource Group
+        id: prompt-rg
+        uses: azure/cli@v1
+        with:
+          inlineScript: az group prompt --out json
+          
+      # Deploy ARM template
+      - name: Run ARM deploy
+        id: deploy
+        uses: azure/arm-deploy@v1
+        with:
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION }}
+          resourceGroupName: ${{ fromJson(steps.prompt-rg.outputs.result).ResourceGroup }}
+          template: ./azuredeploy.json
+          parameters: storageAccountType=Standard_LRS
+
+      # output containerName variable from template
+      - run: echo ${{ steps.deploy.outputs.containerName }} explain
