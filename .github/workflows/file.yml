@@ -1,34 +1,26 @@
 on: [push]
 name: file
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
+    build-and-deploy:
+      runs-on: ubuntu-latest
+      steps:
 
-      # Checkout code
+        # Checkout code
       - uses: actions/checkout@main
 
-      # Log into Azure
+        # Log into Azure
       - uses: azure/login@v1
         with:
-          creds: ${{ secrets.CREDENTIALS_AZURE }}
+          creds: ${{ secrets.CREDENTIALS_AZURE}}
 
-      # Prompt for Resource Group name
-      - name: Prompt for Resource Group
-        id: prompt-rg
-        uses: azure/cli@v1
-        with:
-          inlineScript: az group prompt --out json
-          
-      # Deploy ARM template
+        # Deploy ARM template
       - name: Run ARM deploy
-        id: deploy
         uses: azure/arm-deploy@v1
         with:
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION }}
-          resourceGroupName: ${{ fromJson(steps.prompt-rg.outputs.result).ResourceGroup }}
-          template: ./azuredeploy.json
+          resourceGroupName: ${{ secrets.AZURE_RG }}
+          template: .azuredeploy.parameters.json
           parameters: storageAccountType=Standard_LRS
 
-      # output containerName variable from template
-      - run: echo ${{ steps.deploy.outputs.containerName }} explain
+        # output containerName variable from template
+      - run: echo ${{ steps.deploy.outputs.containerName }}
