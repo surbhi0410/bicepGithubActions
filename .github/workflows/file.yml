@@ -1,6 +1,5 @@
 on: [push]
 name: file
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
