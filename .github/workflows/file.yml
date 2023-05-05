@@ -1,12 +1,12 @@
-name: file
 on: [push]
+name: file
 jobs:
     build-and-deploy:
       runs-on: ubuntu-latest
       steps:
 
         # Checkout code
-      - uses: actions/checkout@file
+      - uses: actions/checkout@main
 
         # Log into Azure
       - uses: azure/login@v1
@@ -21,7 +21,6 @@ jobs:
           resourceGroupName: ${{ secrets.RG01 }}
           template: ./azuredeploy.json
           parameters: storageAccountType=Standard_LRS
-          
 
         # output containerName variable from template
-      - run: echo ${{ steps.deploy.outputs.RG01 }}
+      - run: echo ${{ steps.deploy.outputs.containerName }}
