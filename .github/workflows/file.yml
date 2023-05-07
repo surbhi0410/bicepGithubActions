@@ -1,24 +1,93 @@
-on: [push]
-name: file
+name: eShopOnWeb Build and Test
+
+#Triggers (uncomment line below to use it)
+on: [push, workflow_dispatch]
+
+#Environment variables https://docs.github.com/en/actions/learn-github-actions/environment-variables
+env:
+  RESOURCE-GROUP: RG02
+  LOCATION: eastus
+  TEMPLATE-FILE: .azure/bicep/webapp.bicep
+  SUBSCRIPTION-ID: 8f8121b4-d2d5-4d6e-9300-cc5fe99bf885
+  WEBAPP-NAME: azure-webapp
+
+
 jobs:
-  build-and-deploy:
+  #Build, test and publish .net web project in repository
+  buildandtest:
     runs-on: ubuntu-latest
-    env:
-      ResourceGroupName: RG02
-      ResourceGroupLocation: "eastus"
     steps:
-    - uses: actions/checkout@master
-    - uses: azure/login@v1
+    #checkout the repository
+    - uses: actions/checkout@v2
+    #prepare runner for desired .net version SDK
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
       with:
-        creds: ${{ secrets.CREDENTIALS_AZURE }}
-    - uses: Azure/CLI@v1
+        dotnet-version: '6.0.x'
+        include-prerelease: true
+    #Build/Test/Publish the .net project
+    - name: Build with dotnet
+      run: dotnet build ./eShopOnWeb.sln --configuration Release
+    - name: Test with dotnet
+      run: dotnet test ./eShopOnWeb.sln --configuration Release
+    - name: dotnet publish
+      run: dotnet publish ./src/Web/Web.csproj -c Release -o ${{env.DOTNET_ROOT}}/myapp
+    # upload the published website code artifacts
+    - name: Upload artifact for deployment job
+      uses: actions/upload-artifact@v3
       with:
-        inlineScript: |
-          #!/bin/bash
-          az group create --name ${{ env.ResourceGroupName }} --location ${{ env.ResourceGroupLocation }}
-          echo "Azure resource group created"
-    - uses: azure/arm-deploy@v1
+        name: .net-app
+        path: ${{env.DOTNET_ROOT}}/myapp
+        
+    # upload the bicep template as artifacts for next job
+    - name: Upload artifact for deployment job
+      uses: actions/upload-artifact@v3
       with:
-        resourceGroupName: ${{ env.ResourceGroupName }}
-        template: ./Command.bicep
-        parameters: storageAccountType=Standard_LRS
+        name: bicep-template
+        path: ${{ env.TEMPLATE-FILE }}
+        
+  # Use Bicep to deploy infrastructure + Publish webapp 
+  deploy:
+    runs-on: ubuntu-latest
+    needs: buildandtest
+    environment:
+      name: 'Development'
+    steps:
+    
+    #Download the publish files created in previous job
+    - name: Download artifact from build job
+      uses: actions/download-artifact@v3
+      with:
+        name: .net-app
+        path: .net-app
+  
+    #Download the bicep templates from previous job
+    - name: Download artifact from build job
+      uses: actions/download-artifact@v3
+      with:
+        name: bicep-template
+        path: bicep-template
+        
+   #Login in your azure subscription using a service principal (credentials stored as GitHub Secret in repo)
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+           
+    # Deploy Azure WebApp using Bicep file
+    - name: deploy
+      uses: azure/arm-deploy@v1
+      with:
+        subscriptionId: ${{ env.SUBSCRIPTION-ID }}
+        resourceGroupName: ${{ env.RESOURCE-GROUP }}
+        template: bicep-template/webapp.bicep
+        parameters: 'webAppName=${{ env.WEBAPP-NAME }} location=${{ env.LOCATION }}'
+        failOnStdErr: false   
+    
+    # Publish website to Azure App Service (WebApp)
+    - name: Publish Website to WebApp
+      uses: Azure/webapps-deploy@v2
+      with:
+        app-name: ${{ env.WEBAPP-NAME  }}
+        package: .net-app
+   
